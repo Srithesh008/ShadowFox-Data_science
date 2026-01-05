@@ -1,1 +1,106 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
 
+df = pd.read_csv("delhiaqi.csv")
+df.head()
+
+print(df.info())
+print(df.describe())
+df.isnull().sum
+df['date'] = pd.to_datetime(df['date'],format = "%d-%m-%Y %H:%M")
+df['hour'] = df['date'].dt.hour
+df['day'] = df['date'].dt.day
+df['month'] = df['date'].dt.month
+df['weekday'] = df['date'].dt.day_name()
+df['is_weekend'] = df['weekday'].isin(['Saturday', 'Sunday'])
+
+# Compute average pollutant levels for weekdays vs weekends
+pollutants = ['pm2_5', 'pm10', 'no2', 'so2', 'co', 'o3', 'nh3']
+weekday_vs_weekend_avg = df.groupby('is_weekend')[pollutants].mean().T
+weekday_vs_weekend_avg.columns = ['Weekday', 'Weekend']
+
+# Plot comparison
+plt.figure(figsize=(10, 6))
+weekday_vs_weekend_avg.plot(kind='bar', figsize=(12, 6))
+plt.title("Weekday vs Weekend Pollution Levels in Delhi")
+plt.ylabel("Average Concentration (μg/m³)")
+plt.xlabel("Pollutants")
+plt.grid(axis='y')
+plt.tight_layout()
+plt.savefig("Weekday vs Weekend Pollution")
+plt.show()
+
+
+correlation_matrix = df.drop(columns='date').corr(numeric_only=True)
+print(correlation_matrix)
+
+#correlation heatmap
+plt.figure(figsize=(10, 6))
+sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', fmt=".2f")
+plt.title("Correlation Matrix of Pollutants in Delhi")
+plt.tight_layout()
+plt.savefig("aqi_correlation_heatmap.png")
+plt.show()
+
+
+df['week'] = df['date'].dt.isocalendar().week
+weekly_avg = df.groupby('week')[['pm2_5', 'pm10', 'no2', 'so2', 'co', 'o3', 'nh3']].mean()
+print(weekly_avg)
+
+
+plt.figure(figsize=(12, 6))
+for pollutant in weekly_avg.columns:
+    plt.plot(weekly_avg.index, weekly_avg[pollutant], label=pollutant)
+plt.title("Weekly Average of Pollutants in Delhi")
+plt.xlabel("Week")
+plt.ylabel("Concentration (μg/m³)")
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+plt.savefig("weekly_avg_pollutants.png")
+plt.show()
+
+
+hourly_avg = df.groupby('hour')[['pm2_5', 'pm10']].mean()
+print(hourly_avg)
+
+plt.figure(figsize=(10, 5))
+sns.lineplot(data=hourly_avg)
+plt.title("Hourly Variation of PM2.5 and PM10")
+plt.xlabel("Hour of the Day")
+plt.ylabel("Concentration (μg/m³)")
+plt.grid(True)
+plt.tight_layout()
+plt.savefig("hourly_pm_variation.png")
+plt.show()
+
+# Identify peak pollution hours for PM2.5 and PM10
+peak_pm2_5_hour = hourly_avg['pm2_5'].idxmax()
+peak_pm10_hour = hourly_avg['pm10'].idxmax()
+
+
+print(f"Peak PM2.5 concentration hour: {peak_pm2_5_hour}:00")
+print(f"Peak PM10 concentration hour: {peak_pm10_hour}:00")
+
+
+df["AQI"]=(
+    (df["pm2_5"]/df['pm2_5'].max())*0.6+(df["pm10"]/df['pm10'].max())*0.4
+)*500
+
+
+def aqi_category(a):
+    if a <=50: 
+        return "Good"
+    elif a<=100:
+        return "Satisfactory"
+    elif a<=200:
+        return "Moderate"
+    elif a<=300:
+        return "Poor"
+    elif a<=400:
+        return "Very poor"
+df["aqi_category"]=df["AQI"].apply(aqi_category)
+
+print(df)
